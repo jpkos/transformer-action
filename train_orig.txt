@@ -1,0 +1,107 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Oct 21 13:18:51 2021
+
+@author: jankos
+"""
+
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+from torchvision import datasets, models, transforms
+import math
+import torch
+from PIL import Image
+import cv2
+import matplotlib.pyplot as plt
+from transformer_yolov5 import BBTransformer, BoxEmbedder
+from dataset import VideoClipDataset
+import time
+#%%
+#%%
+def train(model, optimizer, criterion, loaders, epochs, device):
+    for epoch in range(epochs):
+        print(f'epoch {epoch}')
+        corrects = 0
+        loss_av = 0
+        dets = 0
+        start_time = time.time()
+        model.train()
+        for i, data in enumerate(loaders['train']):
+            clip, action, carrying = data['clip'], data['action'], data['carrying']
+            if clip.shape[0] == 1:
+                continue
+            clip = clip.squeeze().to(device)
+            detected = action
+            detected = detected.to(device)
+            optimizer.zero_grad()
+            output = model(clip)
+            _, pred = torch.max(output,1)
+            loss = criterion(output, detected)
+            loss.backward()
+            optimizer.step()
+            corrects += torch.sum(pred == detected)
+            loss_av += loss
+            dets += len(pred)
+        print('train: elapsed time: {}'.format(time.time() - start_time))
+        print(f'correct {corrects}/{dets}')
+        print(f'ratio {corrects/dets}')
+        print(f'{loss_av/dets}')
+        model.eval()
+        corrects = 0
+        loss_av = 0
+        dets = 0
+        for i, data in enumerate(loaders['val']):
+            clip, action, carrying = data['clip'], data['action'], data['carrying']
+            if clip.shape[0] == 1:
+                continue
+            clip = clip.to(device)
+            detected = action
+            detected = detected.to(device)
+            output = model(clip)
+            _, pred = torch.max(output, 1)
+            loss = criterion(output, detected)
+            corrects += torch.sum(pred == detected)
+            loss_av += loss
+            dets += len(pred)
+        print('val: elapsed time: {}'.format(time.time() - start_time))
+        print(f'correct {corrects}/{dets}')
+        print(f'ratio {corrects/dets}')
+        print(f'{loss_av/dets}')
+        if epoch%5==0:
+            torch.save(model.state_dict(), f'pierce_full_weights/w_{epoch}.pt')
+    torch.save(model.state_dict(), 'pierce_full_weights/w_last.pt')
+#%%
+data_transforms = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+if __name__=='__main__':
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print('device is {}'.format(device))
+    batch_size = 16
+    n_work=1
+    n_classes = 2
+    bbt = BBTransformer(img_size=100,d_embed=96, n_head=8,
+                        n_layers=8, n_classes=n_classes)
+    bbt = bbt.to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(bbt.parameters(), weight_decay=0.1)
+    train_set = VideoClipDataset('pierce_full/train/', clip_length=12,
+                                 transform=data_transforms)
+    train_loader = torch.utils.data.DataLoader(train_set,batch_size=batch_size,
+                                                             shuffle=False,
+                                                             num_workers=n_work,
+                                                             pin_memory=True)
+    val_set = VideoClipDataset('pierce_full/val/', clip_length=12,
+                                 transform=data_transforms)
+    val_loader = torch.utils.data.DataLoader(val_set,batch_size=batch_size,
+                                                             shuffle=False,
+                                                             num_workers=n_work,
+                                                             pin_memory=True)
+    loaders = {'train':train_loader, 'val':val_loader}
+    train(bbt, optimizer, criterion, loaders, 50, device)
+    
+    
+
