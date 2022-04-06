@@ -17,8 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torchvision.transforms.functional as tf
 import torch
-from dataset import VideoClipDataset
+from utils.dataset import VideoClipDataset
 from torchvision import datasets, models, transforms
+from skimage import io, transform
 #%%
 class MyRotationTransform:
     """Rotate by one of the given angles."""
@@ -40,12 +41,15 @@ data_transforms = transforms.Compose([
         # MyRotationTransform([90, 180, 270])
         # transforms.RandomRotation((0,270))
     ])
-train_set = VideoClipDataset('pierce_full/train/', clip_length=12,
-                             transform=data_transforms, random_transforms=False)
+train_set = VideoClipDataset('local_files/pierce_full/val/', clip_length=12,
+                             fixed_transforms=data_transforms, random_transforms=False)
 # train_loader = torch.utils.data.DataLoader(train_set,batch_size=1,
 #                                                          shuffle=False,
 #                                                          num_workers=1,
 #                                                          pin_memory=True)
+
+#%%
+d = train_set[5]
 #%%
 for i in range(160,162):
     fig, ax = plt.subplots(nrows=6, ncols=2, figsize=(5,15))
@@ -56,8 +60,28 @@ for i in range(160,162):
     for i in range(12):
         im0 = im[i,:,:,:]
         im1 = im0.permute(1,2,0)
-        im1 = im1 - im1.min()
-        im1 = (im1/im1.max())
+        # im1 = im1 - im1.min()
+        # im1 = (im1)
         # im1 = cv2.cvtColor(im1.numpy(), cv2.COLOR_RGB2BGR)
         axes[i].imshow(im1)
+#%%
+clip_path = 'local_files/pierce_full/train/not_piercing_Patient__2020-10-22-10-10-11-538-000_2621.jpeg'
+clip = io.imread(clip_path)
+#%%
+h,w,ch = clip.shape
+clip = clip.reshape(-1, 100, 100, ch)
+clip = clip.transpose(0,3,1,2)
+# clip = clip.reshape(12, -1, w, ch)
+#%%
+clip = clip.transpose(3,0,1,2)
+clip = transform.resize(clip, (ch, 12, 100, 100))
 
+clip = torch.from_numpy(clip).float()
+clip = clip.permute(1,0,2,3)
+
+clip2 = clip[0,:,:,:]
+clip2 = clip2.permute(1,2,0)
+
+cv2.imshow('t', clip2.numpy())
+#%%
+df = pd.read_csv('local_files/pierce_full_weights/results.csv')

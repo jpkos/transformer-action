@@ -10,7 +10,7 @@ import torchvision
 from torchvision import datasets, models, transforms
 import math
 import torch
-
+import time
 #used https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/vision_transformer/custom.py
 #as example in some parts
 #%%

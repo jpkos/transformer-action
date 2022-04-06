@@ -23,24 +23,24 @@ import torch
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
-from transformer_yolov5 import BBTransformer, BoxEmbedder
+from models.transformer_yolov5 import BBTransformer, BoxEmbedder
 import PIL.ImageOps  
 import matplotlib.dates as mdates
 #%%
 # video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\videos\P13_SeeTrueProject_12_2_2020_18_18_54_sutures.mp4"
-# video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\forced_accuracy\Patient__2020-10-22-10-34-28-944-000.mpg"
-# det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\forced_accuracy\labels"
+# video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/forced_accuracy\Patient__2020-10-22-10-34-28-944-000.mpg"
+# det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/forced_accuracy\labels"
 
-# video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\edmonton_clips\testing\sample_17.mp4"
-# det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\edmonton_clips\testing\labels"
+video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\testing\sample_17.mp4"
+det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\testing\labels"
 
-video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\edmonton_clips\sample_9.mp4"
-det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\edmonton_clips\labels"
+# video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\sample_9.mp4"
+# det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\labels"
 
 # video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\videos\P2_SeeTrueProject_12_2_2020_9_24_50_sutures.mp4"
 # det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\detections\labels"
 #%%
-detections = glob.glob(det_path + '/sample_9*.txt')
+detections = glob.glob(det_path + '/*.txt')
 # detections = glob.glob(det_path + '/*.txt')
 fn = [int(re.findall('_(\d+).txt', x)[0]) for x in detections]
 det_df = pd.DataFrame({'detections':detections, 'frame_n':fn})
@@ -48,7 +48,7 @@ det_df = det_df.sort_values(by='frame_n').reset_index(drop=True)
 #%%
 model = BBTransformer(img_size=100,d_embed=96, n_head=8,
                         n_layers=8, n_classes=2)
-model.load_state_dict(torch.load("pierce_full_weights/w_last.pt"))
+model.load_state_dict(torch.load("local_files/pierce_full_weights/w_last.pt"))
 model.eval()
 #%%
 data_transforms = transforms.Compose([
@@ -56,7 +56,7 @@ data_transforms = transforms.Compose([
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 #%%
-videoname='edmonton-sample_9-test-clip'
+videoname='edmonton-sample-17-clip'
 vidread = cv2.VideoCapture(video_path)
 fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')#VideoWriter_fourcc('m', 'p', '4', 'v')
 video_writer = cv2.VideoWriter(f'{videoname}_predictions.mp4', fourcc, 20, (640, 480))
@@ -142,7 +142,7 @@ while ret:
    print(frame.shape)
    video_writer.write(frame)
    # if i>6000:
-   #     break
+        # break
 detections_df = pd.DataFrame({'frame':frames, 'action':actions})
 detections_df.to_csv(f'{videoname}_detections.csv', index=None)
 video_writer.release()
