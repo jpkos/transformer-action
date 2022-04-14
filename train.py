@@ -87,20 +87,13 @@ def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, s
                 predictions = torch.cat(predictions).cpu().numpy()
                 trues = torch.cat(trues).cpu().numpy()
                 mtrack.calculate(trues, predictions)
-                # tn, fp, fn, tp = confusion_matrix(trues, predictions).ravel()
-                # accuracy = (tp + tn)/(tp+tn+fp+fn)
-                # precision = tp/(tp + fp)
-                # recall = tp/(tp + fn)
-                # f1 = 2*(precision*recall)/(precision + recall)
                 if mtrack.best>best_accuracy:
                     best_accuracy = mtrack.best
                     torch.save(model.state_dict(), f'{save_folder}/w_best.pt')
-                # results.append([epoch+1, (loss_av/dets).item(), accuracy, precision, recall, f1])
             if epoch%n_save==0:
                 torch.save(model.state_dict(), f'{save_folder}/w_{epoch}.pt')
         results_df = mtrack.as_df()
         results_df = results_df.assign(epoch=np.arange(1,len(results_df)+1))
-        # results_df = pd.DataFrame(results, columns=['epoch', 'accuracy', 'loss'])
         results_df.to_csv(f'{save_folder}/results.csv', index=None)
     results_df.plot('epoch',['accuracy', 'precision', 'recall', 'f1'], 
                     subplots=True, layout=(2,2), figsize=(10,10))
