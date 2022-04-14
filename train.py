@@ -3,6 +3,8 @@
 Created on Thu Oct 21 13:18:51 2021
 
 @author: jankos
+
+For training the Bounding Box Transformer
 """
 
 import torch.nn as nn
@@ -19,11 +21,28 @@ from models.transformer_yolov5 import BBTransformer, BoxEmbedder
 import time
 import yaml
 import argparse
-from utils.setup_funcs import setup_train, setup_model, setup_loaders
+from utils.setup_funcs import setup_train, setup_model, setup_dataloaders
 import pandas as pd
+from shutil import copyfile
+import os
+from pathlib import Path
+from torch.optim import lr_scheduler
+from sklearn.metrics import confusion_matrix
+from utils.metrics import MetricsTracker
+import numpy as np
+import matplotlib.pyplot as plt
 #%%
-def train(model, optimizer, criterion, loaders, epochs, device, save_folder):
-    results = []
+torch.manual_seed(0)
+#%%
+def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, save_folder, n_save):
+    """
+    Standard Pytorch training loop. Saves accuracy and loss into csv file
+    after each epoch
+
+    """
+    # results = []
+    best_accuracy = 0
+    mtrack = MetricsTracker()
     for epoch in range(epochs):
         print(f'epoch {epoch}')
         for mode in ['train', 'val']:
@@ -31,11 +50,13 @@ def train(model, optimizer, criterion, loaders, epochs, device, save_folder):
             loss_av = 0
             dets = 0
             start_time = time.time()
+            predictions = []
+            trues = []
             if mode == 'train':
                 model.train()
             else:
                 model.eval()
-            for i, data in enumerate(loaders[mode]):
+            for i, data in enumerate(dataloaders[mode]):
                 optimizer.zero_grad(set_to_none=True)
                 clip, action = data['clip'], data['action']
                 if clip.shape[0] == 1:
@@ -50,6 +71,8 @@ def train(model, optimizer, criterion, loaders, epochs, device, save_folder):
                     if mode == 'train':
                         loss.backward()
                         optimizer.step()
+                predictions.append(pred)
+                trues.append(action)
                 corrects += torch.sum(pred == action)
                 loss_av += loss
                 dets += len(pred)
@@ -58,26 +81,43 @@ def train(model, optimizer, criterion, loaders, epochs, device, save_folder):
             print(f'correct {corrects}/{dets}')
             print(f'ratio {corrects/dets}')
             print(f'{loss_av/dets}')
+            if mode == 'train':
+                scheduler.step()
             if mode == 'val':
-                results.append([epoch+1, (corrects/dets).item(), (loss_av/dets).item()])
-            if epoch%5==0:
+                predictions = torch.cat(predictions).cpu().numpy()
+                trues = torch.cat(trues).cpu().numpy()
+                mtrack.calculate(trues, predictions)
+                # tn, fp, fn, tp = confusion_matrix(trues, predictions).ravel()
+                # accuracy = (tp + tn)/(tp+tn+fp+fn)
+                # precision = tp/(tp + fp)
+                # recall = tp/(tp + fn)
+                # f1 = 2*(precision*recall)/(precision + recall)
+                if mtrack.best>best_accuracy:
+                    best_accuracy = mtrack.best
+                    torch.save(model.state_dict(), f'{save_folder}/w_best.pt')
+                # results.append([epoch+1, (loss_av/dets).item(), accuracy, precision, recall, f1])
+            if epoch%n_save==0:
                 torch.save(model.state_dict(), f'{save_folder}/w_{epoch}.pt')
-        results_df = pd.DataFrame(results, columns=['epoch', 'accuracy', 'loss'])
+        results_df = mtrack.as_df()
+        results_df = results_df.assign(epoch=np.arange(1,len(results_df)+1))
+        # results_df = pd.DataFrame(results, columns=['epoch', 'accuracy', 'loss'])
         results_df.to_csv(f'{save_folder}/results.csv', index=None)
-        torch.save(model.state_dict(), f'{save_folder}/w_last.pt')
+    results_df.plot('epoch',['accuracy', 'precision', 'recall', 'f1'], 
+                    subplots=True, layout=(2,2), figsize=(10,10))
+    plt.savefig(f'{save_folder}/results.png')
+    torch.save(model.state_dict(), f'{save_folder}/w_last.pt')
 #%%
-data_transforms = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-
 if __name__=='__main__':
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', type=str, help='path to yaml file for training')
     parser.add_argument('--model', type=str, help='path to yaml file for model')
     parser.add_argument('--save_folder', type=str, help='where to save the weights')
+    parser.add_argument('--n_save', type=int, default=5, help='save weights after every n epochs')
     args = parser.parse_args()
+    #Create save folder and save training attributes
+    Path(args.save_folder).mkdir(parents=True, exist_ok=True)
+    copyfile(args.train, os.path.join(args.save_folder, os.path.basename(args.train)))
+    copyfile(args.model, os.path.join(args.save_folder, os.path.basename(args.model)))
     #Find model parameters from Yaml file given with --model
     (n_layers,
      n_head,
@@ -90,19 +130,28 @@ if __name__=='__main__':
                         n_layers=n_layers, n_classes=n_classes)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     bbt = bbt.to(device)
-    #Find training parameters
+    #Find training parameters from Yaml file given with --train
     (batch_size,
      n_work,
      lr,
      epochs,
      criterion,
      optimizer,
-     data) = setup_train(args.train, bbt)
+     data,
+     lr_step,
+     lr_gamma,
+     labels) = setup_train(args.train, bbt)
+    #Setup transforms
+    fixed_transforms = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     #Setup dataloaders
-    loaders = setup_loaders(data, clip_length, data_transforms, batch_size, n_work)
+    dataloaders = setup_dataloaders(data, clip_length, fixed_transforms, batch_size, n_work, labels)
     #Start training
-    save_folder = 'local_files/pierce_full_weights/'
-    train(bbt, optimizer, criterion, loaders, epochs, device, save_folder)
+    lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
+    train(bbt, optimizer, criterion, lr_scheduler, dataloaders, epochs, device,
+          args.save_folder, args.n_save)
     
     
 

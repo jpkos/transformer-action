@@ -84,4 +84,5 @@ clip2 = clip2.permute(1,2,0)
 
 cv2.imshow('t', clip2.numpy())
 #%%
-df = pd.read_csv('local_files/pierce_full_weights/results.csv')
+df = pd.read_csv('local_files/pierce_full_weights/sixth_run/results.csv')
+df.plot('epoch', 'accuracy')

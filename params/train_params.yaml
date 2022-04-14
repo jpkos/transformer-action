@@ -1,7 +1,10 @@
 data: [local_files/pierce_full/train/, local_files/pierce_full/val/]
-batch_size: 32
+batch_size: 16
 lr: 0.0001
-epochs: 50
+epochs: 10
 n_work: 1
 optimizer: adam
 criterion: crossentropy
+lr_step: 30
+lr_gamma: 0.1
+labels: [not-pierce, pierce]

@@ -3,6 +3,11 @@
 Created on Wed Oct 20 15:40:24 2021
 
 @author: jankos
+
+This file defines the Bounding Box Transformer
+
+Used https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/vision_transformer/custom.py
+as example in some parts
 """
 import torch.nn as nn
 import torch.optim as optim
@@ -11,12 +16,13 @@ from torchvision import datasets, models, transforms
 import math
 import torch
 import time
-#used https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/vision_transformer/custom.py
-#as example in some parts
+
 #%%
-class BoxEmbedder(nn.Module):
-    #creates embeddings of the bounding boxes
-    #take the bounding boxes, apply conv with kernel size = img size, flatten
+class BoxEmbedder(nn.Module): #TBD: try different embedding approaches
+    """
+    creates embeddings of the bounding boxes
+    take the bounding boxes, apply conv with kernel size = img size, flatten
+    """
     def __init__(self, img_size, embed_dim=96):
         super().__init__()
         self.Conv = nn.Conv2d(3, embed_dim, kernel_size=img_size,
@@ -29,9 +35,11 @@ class BoxEmbedder(nn.Module):
         return x
         
 class PositionalEncoding(nn.Module):
-    #Applied positional encoding to the stack of boxes so the model can use
-    #positional (i.e. which box came after which box) information
-    #from https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+    """
+    Applied positional encoding to the stack of boxes so the model can use
+    positional (i.e. which box came after which box) information
+    from https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+    """
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -44,10 +52,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        """
-        Args:
-            x: Tensor, shape [seq_len, batch_size, embedding_dim]
-        """
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
 
@@ -67,12 +71,13 @@ class BBTransformer(nn.Module):
     
     def __init__(self, img_size, d_embed, n_head, n_layers, n_classes, tran_dropout=0.3):
         super().__init__()
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=d_embed,
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_embed,
                                                         nhead=n_head,
                                                         batch_first=True)
-        self.trans_encoder = nn.TransformerEncoder(self.encoder_layer,
+        self.trans_encoder = nn.TransformerEncoder(encoder_layer,
                                                    num_layers=n_layers)
-        self.pos_encoder = PositionalEncoding(d_embed, dropout=tran_dropout, max_len=d_embed)
+        self.pos_encoder = PositionalEncoding(d_embed, dropout=tran_dropout,
+                                              max_len=d_embed)
         self.norm = nn.LayerNorm(d_embed, eps=1e-6)
         self.head = nn.Linear(d_embed, n_classes)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, d_embed))

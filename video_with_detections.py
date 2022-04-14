@@ -48,7 +48,7 @@ det_df = det_df.sort_values(by='frame_n').reset_index(drop=True)
 #%%
 model = BBTransformer(img_size=100,d_embed=96, n_head=8,
                         n_layers=8, n_classes=2)
-model.load_state_dict(torch.load("local_files/pierce_full_weights/w_last.pt"))
+model.load_state_dict(torch.load("local_files/pierce_full_weights/sixth_run/w_70_best.pt"))
 model.eval()
 #%%
 data_transforms = transforms.Compose([
@@ -56,7 +56,7 @@ data_transforms = transforms.Compose([
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 #%%
-videoname='edmonton-sample-17-clip'
+videoname='edmonton-sample-17-clip-3'
 vidread = cv2.VideoCapture(video_path)
 fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')#VideoWriter_fourcc('m', 'p', '4', 'v')
 video_writer = cv2.VideoWriter(f'{videoname}_predictions.mp4', fourcc, 20, (640, 480))
@@ -155,7 +155,7 @@ detections_df = detections_df.reindex(new_index)
 detections_df = detections_df.reset_index()
 #%%
 detections_df['binary'] = (detections_df['action'] == 'pierce').astype(int)
-detections_df['time'] = pd.to_datetime((detections_df['frame']/25), unit='s')
+detections_df['time'] = pd.to_datetime((detections_df['frame']/20), unit='s')
 #%%
 fig, ax = plt.subplots(figsize=(15,4))
 ax.plot(detections_df['time'], detections_df['binary'])
