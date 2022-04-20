@@ -11,7 +11,7 @@ import re
 import glob
 import os
 #%%
-file_folder = 'local_files/pierce_full/val'
+file_folder = 'local_files/pierce_full/train'
 files = glob.glob(os.path.join(file_folder, '*.jpeg'))
 labels = []
 for file in files:

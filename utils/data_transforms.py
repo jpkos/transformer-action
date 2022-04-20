@@ -15,8 +15,8 @@ class RandomTransforms(object):
     def __init__(self):
         self.angle = int(np.random.choice([0, 90, 180, 270]))
         self.hue = (np.random.random()-0.5)*0.3
-        self.hp = np.random.random()
-        self.vp = np.random.random()
+        # self.hp = np.random.random()
+        # self.vp = np.random.random()
         self.prot = np.random.random()
         self.phue = np.random.random()
     
@@ -25,9 +25,9 @@ class RandomTransforms(object):
             x = tf.rotate(x, self.angle)
         if self.phue>0.3:
             x = tf.adjust_hue(x, self.hue)
-        if self.hp>0.5:
-            x = tf.hflip(x)
-        if self.vp>0.5:
-            x = tf.hflip(x)
+        # if self.hp>0.5:
+        #     x = tf.hflip(x)
+        # if self.vp>0.5:
+        #     x = tf.hflip(x)
         return x
     

@@ -22,6 +22,7 @@ import time
 import yaml
 import argparse
 from utils.setup_funcs import setup_train, setup_model, setup_dataloaders
+from utils.general import create_save_folder
 import pandas as pd
 from shutil import copyfile
 import os
@@ -76,7 +77,7 @@ def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, s
                 corrects += torch.sum(pred == action)
                 loss_av += loss
                 dets += len(pred)
-                print(f'Predicted imgs: {i+1}', end='\r')
+                print(f'Predicted imgs: {dets}', end='\r')
             print(f'{mode}: elapsed time: {time.time() - start_time}')
             print(f'correct {corrects}/{dets}')
             print(f'ratio {corrects/dets}')
@@ -108,7 +109,8 @@ if __name__=='__main__':
     parser.add_argument('--n_save', type=int, default=5, help='save weights after every n epochs')
     args = parser.parse_args()
     #Create save folder and save training attributes
-    Path(args.save_folder).mkdir(parents=True, exist_ok=True)
+    # Path(args.save_folder).mkdir(parents=True, exist_ok=True)
+    args.save_folder = create_save_folder(args.save_folder)
     copyfile(args.train, os.path.join(args.save_folder, os.path.basename(args.train)))
     copyfile(args.model, os.path.join(args.save_folder, os.path.basename(args.model)))
     #Find model parameters from Yaml file given with --model
