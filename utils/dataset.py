@@ -42,6 +42,7 @@ class VideoClipDataset(Dataset):
         """
         self.random_transforms = random_transforms
         clip_data = pd.read_csv(os.path.join(clip_dir, 'labels.csv'))
+        #clip_data = clip_data.sample(frac=1).reset_index(drop=True)#testing, comment out
         self.clips = clip_data['file'].values
         self.labels = clip_data['label'].values
         self.fixed_transforms = fixed_transforms

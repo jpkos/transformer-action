@@ -22,7 +22,7 @@ import time
 import yaml
 import argparse
 from utils.setup_funcs import setup_train, setup_model, setup_dataloaders
-from utils.general import create_save_folder
+from utils.general import create_save_folder, print_model_params, plot_results
 import pandas as pd
 from shutil import copyfile
 import os
@@ -35,13 +35,19 @@ import matplotlib.pyplot as plt
 #%%
 torch.manual_seed(0)
 #%%
-def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, save_folder, n_save):
+#def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, save_folder, n_save):
+def train(model, train_params, args, scheduler, dataloaders, device):
     """
     Standard Pytorch training loop. Saves accuracy and loss into csv file
     after each epoch
 
     """
     # results = []
+    optimizer = train_params['optimizer']
+    criterion = train_params['criterion']
+    epochs = train_params['epochs']
+    save_folder = args.save_folder
+    n_save = args.n_save
     best_accuracy = 0
     mtrack = MetricsTracker()
     for epoch in range(epochs):
@@ -79,25 +85,30 @@ def train(model, optimizer, criterion, scheduler, dataloaders, epochs, device, s
                 dets += len(pred)
                 print(f'Predicted imgs: {dets}', end='\r')
             print(f'{mode}: elapsed time: {time.time() - start_time}')
-            print(f'correct {corrects}/{dets}')
-            print(f'ratio {corrects/dets}')
-            print(f'{loss_av/dets}')
+            # print(f'correct {corrects}/{dets}')
+            # print(f'ratio {corrects/dets}')
+            # print(f'{loss_av/dets}')
+            predictions = torch.cat(predictions).cpu().numpy()
+            trues = torch.cat(trues).cpu().numpy()
             if mode == 'train':
                 scheduler.step()
+                mtrack.calculate(trues, predictions, mode=mode, epoch=epoch)
             if mode == 'val':
-                predictions = torch.cat(predictions).cpu().numpy()
-                trues = torch.cat(trues).cpu().numpy()
-                mtrack.calculate(trues, predictions)
+                # predictions = torch.cat(predictions).cpu().numpy()
+                # trues = torch.cat(trues).cpu().numpy()
+                mtrack.calculate(trues, predictions, mode=mode, epoch=epoch)
                 if mtrack.best>best_accuracy:
                     best_accuracy = mtrack.best
                     torch.save(model.state_dict(), f'{save_folder}/w_best.pt')
-            if epoch%n_save==0:
+                
+            if epoch%n_save==0 and n_save!=-1:
                 torch.save(model.state_dict(), f'{save_folder}/w_{epoch}.pt')
         results_df = mtrack.as_df()
-        results_df = results_df.assign(epoch=np.arange(1,len(results_df)+1))
+        # results_df = results_df.assign(epoch=np.arange(1,len(results_df)+1))
         results_df.to_csv(f'{save_folder}/results.csv', index=None)
-    results_df.plot('epoch',['accuracy', 'precision', 'recall', 'f1'], 
-                    subplots=True, layout=(2,2), figsize=(10,10))
+    plot_results(results_df)
+    # results_df.groupby('mode').plot('epoch',['accuracy', 'precision', 'recall', 'f1'], 
+    #                 subplots=True, layout=(2,2), figsize=(10,10))
     plt.savefig(f'{save_folder}/results.png')
     torch.save(model.state_dict(), f'{save_folder}/w_last.pt')
 #%%
@@ -114,39 +125,27 @@ if __name__=='__main__':
     copyfile(args.train, os.path.join(args.save_folder, os.path.basename(args.train)))
     copyfile(args.model, os.path.join(args.save_folder, os.path.basename(args.model)))
     #Find model parameters from Yaml file given with --model
-    (n_layers,
-     n_head,
-     n_classes,
-     d_embed,
-     img_size,
-     clip_length) = setup_model(args.model)
+    mp = setup_model(args.model)
     #Load model
-    bbt = BBTransformer(img_size=img_size, d_embed=d_embed, n_head=n_head,
-                        n_layers=n_layers, n_classes=n_classes)
+    bbt = BBTransformer(img_size=mp['img_size'], d_embed=mp['d_embed'], n_head=mp['n_head'],
+                        n_layers=mp['n_layers'], n_classes=mp['n_classes'], d_hid=mp['d_hid'])
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     bbt = bbt.to(device)
+    print_model_params(bbt)
     #Find training parameters from Yaml file given with --train
-    (batch_size,
-     n_work,
-     lr,
-     epochs,
-     criterion,
-     optimizer,
-     data,
-     lr_step,
-     lr_gamma,
-     labels) = setup_train(args.train, bbt)
+    tp = setup_train(args.train, bbt)
     #Setup transforms
     fixed_transforms = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     #Setup dataloaders
-    dataloaders = setup_dataloaders(data, clip_length, fixed_transforms, batch_size, n_work, labels)
+    dataloaders = setup_dataloaders(tp['data'], mp['clip_length'], fixed_transforms, tp['batch_size'], tp['n_work'], tp['labels'])
     #Start training
-    lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
-    train(bbt, optimizer, criterion, lr_scheduler, dataloaders, epochs, device,
-          args.save_folder, args.n_save)
+    # lr_scheduler = lr_scheduler.StepLR(tp['optimizer'], step_size=tp['lr_step'], gamma=tp['lr_gamma'])
+    lr_scheduler = lr_scheduler.CosineAnnealingLR(tp['optimizer'], T_max=tp['T_max'])
+    train(model=bbt, train_params=tp, args=args, scheduler=lr_scheduler,
+          dataloaders=dataloaders, device=device)
     
     
 

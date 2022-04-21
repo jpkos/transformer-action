@@ -20,6 +20,20 @@ for file in files:
         labels.append('pierce')
     else:
         labels.append('not-pierce')
+#%%
+file_folder = 'local_files/action_dataset/val'
+files = glob.glob(os.path.join(file_folder, '*.jpeg'))
+labels = []
+for file in files:
+    basename = os.path.basename(file)
+    labels.append(basename.split('_')[1])
+#%%
+file_folder = 'local_files/toy_dataset/test'
+files = glob.glob(os.path.join(file_folder, '*.jpeg'))
+labels = []
+for file in files:
+    basename = os.path.basename(file)
+    labels.append(basename.split('_')[0])
         
 #%%
 df = pd.DataFrame({'file':files, 'label':labels})

@@ -14,8 +14,8 @@ import torch
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
-from transformer_yolov5 import BBTransformer, BoxEmbedder
-from dataset import VideoClipDataset
+from models.transformer_yolov5 import BBTransformer, BoxEmbedder
+from utils.dataset import VideoClipDataset
 import time
 import glob
 import os
@@ -36,7 +36,7 @@ def detect(model, data_path, device):
 # P6_path = r"C:\Users\jankos\tyokansio\projektit\carry-detect\P6clips_12f\val"
 # data_path = 'action_dataset/val/'
 #data_path = r"C:\Users\jankos\tyokansio\projektit\transformer-action\needle_stacks_for_testing2"
-data_path = 'pierce_fourth_pilot/val'
+data_path = 'local_files/action_dataset/val/'
 n_work = 1
 batch_size = 16
 data_transforms = transforms.Compose([
@@ -44,16 +44,18 @@ data_transforms = transforms.Compose([
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 val_set = VideoClipDataset(data_path, clip_length=12,
-                             transform=data_transforms)
+                             fixed_transforms=data_transforms, labels=['needle', 'thread', 'nothing'])
 val_loader = torch.utils.data.DataLoader(val_set,batch_size=batch_size,
-                                                         num_workers=n_work)
+                                                             shuffle=False,
+                                                             num_workers=n_work,
+                                                             pin_memory=True)
 
         
 
 #%%
-model = BBTransformer(img_size=100,d_embed=96, n_head=8,
-                        n_layers=8, n_classes=3)
-model.load_state_dict(torch.load('weights_pierce_4th_pilot/w_last.pt'))
+model = BBTransformer(img_size=100,d_embed=768, n_head=12,
+                        n_layers=12, n_classes=4, d_hid=3072)
+model.load_state_dict(torch.load('local_files/action_run10/w_last.pt'))
 model.eval()
 #%%
 criterion = nn.CrossEntropyLoss()
@@ -61,10 +63,10 @@ criterion = nn.CrossEntropyLoss()
 corrects = 0
 loss_av = 0
 dets = 0
-class_map =  {v: k for k, v in val_set.action_map.items()}
+class_map =  {v: k for k, v in val_set.label_map.items()}
 print(class_map)
 
-class_map =  {v: k for k, v in val_set.action_map.items()}
+class_map =  {v: k for k, v in val_set.label_map.items()}
 print(class_map)
 start_time = time.time()
 predictions = []
@@ -97,7 +99,7 @@ for i, data in enumerate(val_set):
     plt.imshow(im.reshape(600,200,3))#.transpose(1,0,2))
     plt.title(title_text, fontsize=20)
     plt.tight_layout()
-    plt.savefig('pierce_test_figures/pierce_predict_{}.png'.format(i))
+    plt.savefig('local_files/action_run10/val/action_predict_{}.png'.format(i))
     plt.close()
     # if i>1:
         # break

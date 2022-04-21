@@ -3,6 +3,8 @@
 Created on Fri Apr  1 14:55:52 2022
 
 @author: jankos
+
+For testing random stuff
 """
 
 import numpy as np
@@ -20,6 +22,7 @@ import torch
 from utils.dataset import VideoClipDataset
 from torchvision import datasets, models, transforms
 from skimage import io, transform
+from models.transformer_yolov5 import BBTransformer
 #%%
 class MyRotationTransform:
     """Rotate by one of the given angles."""
@@ -41,8 +44,8 @@ data_transforms = transforms.Compose([
         # MyRotationTransform([90, 180, 270])
         # transforms.RandomRotation((0,270))
     ])
-train_set = VideoClipDataset('local_files/pierce_full/val/', clip_length=12,
-                             fixed_transforms=data_transforms, random_transforms=False)
+train_set = VideoClipDataset('local_files/toy_dataset/val', clip_length=12,
+                             fixed_transforms=data_transforms, random_transforms=False, labels=['left', 'right', 'up', 'down'])
 # train_loader = torch.utils.data.DataLoader(train_set,batch_size=1,
 #                                                          shuffle=False,
 #                                                          num_workers=1,
@@ -51,8 +54,8 @@ train_set = VideoClipDataset('local_files/pierce_full/val/', clip_length=12,
 #%%
 d = train_set[5]
 #%%
-for i in range(160,162):
-    fig, ax = plt.subplots(nrows=6, ncols=2, figsize=(5,15))
+for i in range(20,25):
+    fig, ax = plt.subplots(ncols=12, figsize=(5,15))
     axes = ax.flatten()
     clip1 = train_set[i]
     im = clip1['clip']
@@ -64,6 +67,11 @@ for i in range(160,162):
         # im1 = (im1)
         # im1 = cv2.cvtColor(im1.numpy(), cv2.COLOR_RGB2BGR)
         axes[i].imshow(im1)
+#%%
+bbt = BBTransformer(100, 96, 8, 8, 4)
+bbt.eval()
+#%%
+y = bbt(im.unsqueeze(0))
 #%%
 clip_path = 'local_files/pierce_full/train/not_piercing_Patient__2020-10-22-10-10-11-538-000_2621.jpeg'
 clip = io.imread(clip_path)

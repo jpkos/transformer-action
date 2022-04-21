@@ -15,41 +15,30 @@ import os
 def setup_train(yaml_path, model):
     with open(yaml_path, 'r') as train_params:
         tp = yaml.safe_load(train_params)
-    batch_size = tp['batch_size']
-    n_work = tp['n_work']
-    lr = tp['lr']
-    epochs = tp['epochs']
     if tp['criterion'] == 'crossentropy':
-        criterion = nn.CrossEntropyLoss()
+        tp['criterion'] = nn.CrossEntropyLoss(label_smoothing=tp['label_smoothing'])
     else:
-        criterion = None
-        print("Not valid criterion, only 'crossentropy' supported for now.")
-        
+        tp['criterion'] = None
+        raise ValueError("Not valid criterion, only 'crossentropy' supported for now.")
+        # print("Not valid criterion, only 'crossentropy' supported for now.")
     if tp['optimizer'] == 'adam':
-        optimizer = optim.Adam(model.parameters(), weight_decay=0.1, lr=lr)
+        tp['optimizer'] = optim.Adam(model.parameters(), weight_decay=tp['lr_gamma'], lr=tp['lr'])
     elif tp['optimizer'] == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=lr)
+        tp['optimizer'] = optim.SGD(model.parameters(), lr=tp['lr'], weight_decay=tp['lr_gamma'])
+    elif tp['optimizer'] == 'adamw':
+        tp['optimizer'] == optim.AdamW(model.parameters, lr=tp['lr'], weight_decay=tp['lr_gamma'])
     else:
-        optimizer = None
-        print("Not valid loss, try 'adam' or 'sgd'")
+        tp['optimizer'] = None
+        raise ValueError("Not valid loss, try 'adam', 'adamw' or 'sgd'")
+        # print("Not valid loss, try 'adam' or 'sgd'")
     print("Training parameters: ", tp)
-    data = tp['data']
-    lr_step = tp['lr_step']
-    lr_gamma = tp['lr_gamma']
-    labels = tp['labels']
-    return batch_size, n_work, lr, epochs, criterion, optimizer, data, lr_step, lr_gamma, labels
+    return tp
 
 def setup_model(yaml_path):
     with open(yaml_path, 'r') as model_params:
         mp = yaml.safe_load(model_params)
-    n_layers = mp['n_layers']
-    n_head = mp['n_head']
-    n_classes = mp['n_classes']
-    d_embed = mp['d_embed']
-    img_size = mp['img_size']
-    clip_length = mp['clip_length']
     print("Model parameters: ", mp)
-    return n_layers, n_head, n_classes, d_embed, img_size, clip_length
+    return mp
 
 def setup_dataloaders(data, clip_length, data_transforms, batch_size, n_work, labels):
     train_set = VideoClipDataset(data[0], clip_length=clip_length,

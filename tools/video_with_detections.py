@@ -30,7 +30,7 @@ import matplotlib.dates as mdates
 # video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\videos\P13_SeeTrueProject_12_2_2020_18_18_54_sutures.mp4"
 # video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/forced_accuracy\Patient__2020-10-22-10-34-28-944-000.mpg"
 # det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/forced_accuracy\labels"
-
+# 
 video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\testing\sample_17.mp4"
 det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_clips\testing\labels"
 
@@ -40,15 +40,16 @@ det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\data/edmonton_cl
 # video_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\videos\P2_SeeTrueProject_12_2_2020_9_24_50_sutures.mp4"
 # det_path = r"C:\Users\jankos\tyokansio\projektit\pierce-project\suturing_videos\detections\labels"
 #%%
-detections = glob.glob(det_path + '/*.txt')
+detections = glob.glob(det_path + '/sample_17_*.txt')
 # detections = glob.glob(det_path + '/*.txt')
-fn = [int(re.findall('_(\d+).txt', x)[0]) for x in detections]
+fn = [int(re.findall('sample_17_(\d+).txt', x)[0]) for x in detections]
+#%%
 det_df = pd.DataFrame({'detections':detections, 'frame_n':fn})
 det_df = det_df.sort_values(by='frame_n').reset_index(drop=True)
 #%%
-model = BBTransformer(img_size=100,d_embed=96, n_head=8,
-                        n_layers=8, n_classes=2)
-model.load_state_dict(torch.load("local_files/pierce_full_weights/sixth_run/w_70_best.pt"))
+model = BBTransformer(img_size=100,d_embed=768, n_head=12,
+                        n_layers=12, n_classes=4, d_hid=3072)
+model.load_state_dict(torch.load("local_files/action_run10/w_best.pt"))
 model.eval()
 #%%
 data_transforms = transforms.Compose([
@@ -56,10 +57,10 @@ data_transforms = transforms.Compose([
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 #%%
-videoname='edmonton-sample-17-clip-3'
+videoname='edmonton-sample-17-clip-1'
 vidread = cv2.VideoCapture(video_path)
 fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')#VideoWriter_fourcc('m', 'p', '4', 'v')
-video_writer = cv2.VideoWriter(f'{videoname}_predictions.mp4', fourcc, 20, (640, 480))
+video_writer = cv2.VideoWriter(f'local_files/{videoname}_action_predictions.mp4', fourcc, 20, (640, 480))
 start_frame = 1
 vidread.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 i=start_frame
@@ -67,11 +68,11 @@ ret = True
 stacks = []
 participant = os.path.basename(det_path).split('_')[0]
 #action_map = {0: 'pierce', 1: 'transport', 2: 'nothing'}
-action_map = {0: 'not pierce', 1: 'pierce'}
+action_map = {0: 'needle', 1: 'thread', 2: 'nothing'}
 last_detection = 1
 max_gap = 20
 
-needle_id = 3
+needle_id = 1
 width = 640
 height = 480
 actions = []
@@ -132,6 +133,7 @@ while ret:
        st = st.unsqueeze(dim=0)
        out = model(st)
        _, pred = torch.max(out, 1)
+       print('pred ', pred)
        # print("predicted ", pred.item(), out)
        pred_text = action_map[pred.item()]
        actions.append(pred_text)
@@ -144,7 +146,7 @@ while ret:
    # if i>6000:
         # break
 detections_df = pd.DataFrame({'frame':frames, 'action':actions})
-detections_df.to_csv(f'{videoname}_detections.csv', index=None)
+detections_df.to_csv(f'local_files/{videoname}_detections.csv', index=None)
 video_writer.release()
 cv2.destroyAllWindows()
 #%%

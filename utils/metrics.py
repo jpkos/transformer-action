@@ -20,25 +20,29 @@ from shutil import copyfile
 import os
 from pathlib import Path
 from torch.optim import lr_scheduler
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, multilabel_confusion_matrix, classification_report
 
 #%%
 class MetricsTracker():
     
-    def __init__(self):
+    def __init__(self, labels=[]):
         self.results = []
         self.best = 0
-        self.columns = ['accuracy', 'precision', 'recall', 'f1']
+        self.columns = ['epoch', 'accuracy', 'precision', 'recall', 'f1', 'mode']
         
-    def calculate(self, true, pred):
-        tn, fp, fn, tp = confusion_matrix(true, pred).ravel()
-        accuracy = (tp + tn)/(tp+tn+fp+fn)
-        precision = tp/(tp + fp)
-        recall = tp/(tp + fn)
-        f1 = 2*(precision*recall)/(precision + recall)
-        if accuracy>self.best:
+    def calculate(self, true, pred, mode, epoch=0, prints=True):
+        report = classification_report(true, pred, output_dict=True, zero_division=0)
+        accuracy = report['accuracy']
+        macro_dic = report['macro avg']
+        precision = macro_dic['precision']
+        recall = macro_dic['recall']
+        f1 = macro_dic['f1-score']
+        if accuracy>self.best and mode=='val':
             self.best = accuracy
-        self.results.append([accuracy, precision, recall, f1])
+        self.results.append([epoch, accuracy, precision, recall, f1, mode])
+        if prints:
+            print(f'mode: {mode}, epoch: {epoch}, accuracy: {accuracy:.2f}, precision: {precision:.2f} ' + 
+                  f'recall: {recall:.2f}, f1: {f1:.2f}')
         
     def as_df(self):
         return pd.DataFrame(self.results, columns=self.columns)

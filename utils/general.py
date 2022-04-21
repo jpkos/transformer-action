@@ -9,6 +9,8 @@ import glob
 import os
 from pathlib import Path
 import re
+import seaborn as sns
+import matplotlib.pyplot as plt
 #%%
 
 def find_last_run(runs):
@@ -29,4 +31,13 @@ def create_save_folder(path):
     
     return save_path
     
+def print_model_params(model):
+    ps = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+    print(f'Model parameters: {ps}')
 
+def plot_results(df):
+    fig, ax = plt.subplots(nrows=2,ncols=2, figsize=(10,10))
+    ax = ax.flatten()
+    for i, col in enumerate(['accuracy', 'precision', 'recall', 'f1']):
+        sns.lineplot(x='epoch', y=col, hue='mode', data=df, ax=ax[i], legend=(i==0))
+    return fig, ax
